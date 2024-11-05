@@ -12,12 +12,17 @@ Project FIT in ALICE. As part of the project, we decided to create environmental
 ## Requirements
 
 - KA-Nucleo-Weather
+- Arduino or a similar microcontroller
   
 ## Project Progress
 
 - Week: October 17-24, 2024:
   1. Familiarization with equipment documentation.
   2. Establishing basic project assumptions.
+- Two weeks: October 25, 2024 - November 7, 2024:
+  1.Reading temperature, humidity, and pressure from sensors.
+  2.Preparing the configuration screen.
+
 
 ## Documentation
 
