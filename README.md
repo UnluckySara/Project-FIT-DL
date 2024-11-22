@@ -22,7 +22,7 @@ Project FIT in ALICE. As part of the project, we decided to create environmental
 - Two weeks: October 25, 2024 - November 7, 2024:
   1. Reading temperature, humidity, and pressure from sensors.
   2. Preparing the configuration screen.
-- Four weeks: November 14, 2024 - November 21, 2024:
+- November 14, 2024 - November 21, 2024:
   1. Reading illuminance
   2. Small changes in configuration screen.
   3. Few changes in displaying measurements.
