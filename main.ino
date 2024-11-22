@@ -119,7 +119,7 @@ void Title_Window()
     { 
       
       String input = Serial.readStringUntil('\n'); 
-      if (input.equals("?"))
+      if (input.equals("?")||input.equals(" "))
       {    
           Serial.println();
           Serial.println("Welcome to the configuration window.");
