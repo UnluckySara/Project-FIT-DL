@@ -26,6 +26,11 @@ Project FIT in ALICE. As part of the project, we decided to create environmental
   1. Reading illuminance
   2. Small changes in configuration screen.
   3. Few changes in displaying measurements.
+- November 22, 2024 - November 28, 2024:
+  1. Configuration screen using SerialMenu library.
+  2. LED alert when light detected.
+  3. Protection against user trying to put bad data to critical values.
+  4. Some of code cleanup
 
 
 ## Documentation
