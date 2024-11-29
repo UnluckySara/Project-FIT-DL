@@ -15,6 +15,7 @@ Generic_LM75 stlm75;
 /*======================================================================*/
 
 bool start_screen = true;
+bool continous_display = false;
 String inputBuffer = "";
 float upper_temp_value = 30.0;
 float lower_temp_value = -5.0;
@@ -22,21 +23,27 @@ float critical_pressure = 1000.0;
 float critical_humidity = 90.0;
 uint8_t CmdCode;
 float pressure, temperature, humidity, illuminance = {};
+char time_array[20];
+byte seconds, minutes, hours, day, month;
+uint16_t days, year;
+unsigned long prev_time = 0;
 
 /*======================================================================*/
 
 SerialMenuCmd menu;
 
 tMenuCmdTxt txt_welcome[] = "\nWelcome to the configuration window.\n";
-tMenuCmdTxt txt_values[] = "s - display current settings";
+tMenuCmdTxt txt_values[] = "s - display current settings.";
 tMenuCmdTxt txt_set_h[] = "h - set critical value humidity.";
 tMenuCmdTxt txt_set_p[] = "p - set critical value pressure.";
 tMenuCmdTxt txt_set_tl[] = "t - set lower critical temperature value.";
 tMenuCmdTxt txt_set_th[] = "T - set higher critical temperature value.";
 tMenuCmdTxt txt_reset[] = "r - reset device.";
-tMenuCmdTxt txt_display[] = "d - display last measurement";
+tMenuCmdTxt txt_display[] = "m - display last measurement.";
+tMenuCmdTxt txt_set_date[] = "d - set current date";
+tMenuCmdTxt txt_continous[] = "c - toggle continous measurement display.";
 
-tMenuCmdTxt txt5_DisplayMenu[] = "? - Display menu";
+tMenuCmdTxt txt5_DisplayMenu[] = "? - Display menu.";
 
 tMenuCmdTxt txt_Prompt[] = "";
 
@@ -70,7 +77,11 @@ void do_settings(void){
 
 void do_display(void)
 {
+    Serial.println();
 
+    sprintf(time_array,"%02d:%02d:%02d %02d,%02d,%04d",hours,minutes,seconds,day,month,year);
+    Serial.println(time_array);
+    
    
     Serial.print("Humidity HTS221: ");
     Serial.print(humidity);
@@ -85,7 +96,7 @@ void do_display(void)
     Serial.println(" C");
 
     Serial.print("Illuminance TSL2571: ");
-    Serial.print(illuminance);
+    Serial.print(illuminance,4);
     Serial.println(" lux");
 
     menu.giveCmdPrompt();
@@ -187,6 +198,123 @@ void do_set_th(void){
 
 }
 
+void do_set_date(void){
+  String aValue = "Enter hour";
+
+  if (menu.getStrValue(aValue) == false)
+  {
+    Serial.println("Entry failure");
+  }
+  else
+  {
+    hours = atof(aValue.c_str());
+  }
+
+  aValue = "Enter minute";
+
+  if (menu.getStrValue(aValue) == false)
+  {
+    Serial.println("Entry failure");
+  }
+  else
+  {
+    minutes = atof(aValue.c_str());
+  }
+
+  aValue = "Enter second";
+
+  if (menu.getStrValue(aValue) == false)
+  {
+    Serial.println("Entry failure");
+  }
+  else
+  {
+    seconds = atof(aValue.c_str());
+  }
+
+  aValue = "Enter year";
+
+  if (menu.getStrValue(aValue) == false)
+  {
+    Serial.println("Entry failure");
+  }
+  else
+  {
+    year = atof(aValue.c_str());
+  }
+
+  aValue = "Enter month";
+
+  if (menu.getStrValue(aValue) == false)
+  {
+    Serial.println("Entry failure");
+  }
+  else
+  {
+    month = atof(aValue.c_str());
+  }
+
+  aValue = "Enter day";
+
+  if (menu.getStrValue(aValue) == false)
+  {
+    Serial.println("Entry failure");
+  }
+  else
+  {
+    day = atof(aValue.c_str());
+  }
+
+  switch (month){
+    case 1:
+      days=day;
+      break;
+    case 2:
+      days=day+31;
+      break;
+    case 3:
+      days=day+59;
+      break;
+    case 4:
+      days=day+90;
+      break;
+    case 5:
+      days=day+120;
+      break;
+    case 6:
+      days=day+151;
+      break;
+    case 7:
+      days=day+181;
+      break;
+    case 8:
+      days=day+212;
+      break;
+    case 9:
+      days=day+243;
+      break;
+    case 10:
+      days=day+273;
+      break;
+    case 11:
+      days=day+304;
+      break;
+    case 12:
+      days=day+334;
+      break;
+    default:
+      break;
+  }
+  Serial.println();
+  Serial.println("Time set.");
+  Serial.println();
+
+  sprintf(time_array,"%02d:%02d:%02d %02d,%02d,%04d",hours,minutes,seconds,day,month,year);
+  Serial.println(time_array);
+
+  menu.giveCmdPrompt();
+}
+
 bool temp_check(void){
   if(lower_temp_value > upper_temp_value){
     Serial.println();
@@ -209,6 +337,82 @@ bool temp_check(void){
   }
 }
 
+void do_time(void){
+  if(millis() >= prev_time){
+    prev_time = prev_time + 1000;
+    seconds++;
+    if(seconds == 60){
+      seconds = 0;
+      minutes++;
+      if(minutes ==60){
+        minutes = 0;
+        hours++;
+        if(hours==24){
+          hours = 1;
+          days++;
+
+
+          switch (days){
+            case 32:
+              day=1;
+              month=2;
+              break;
+            case 60:
+              day=1;
+              month=3;
+              break;
+            case 91:
+              day=1;
+              month=4;
+              break;
+            case 121:
+              day=1;
+              month=5;
+              break;
+            case 152:
+              day=1;
+              month=6;
+              break;
+            case 182:
+              day=1;
+              month=7;
+              break;
+            case 213:
+              day=1;
+              month=8;
+              break;
+            case 244:
+              day=1;
+              month=9;
+              break;
+            case 274:
+              day=1;
+              month=10;
+              break;
+            case 305:
+              day=1;
+              month=11;
+              break;
+            case 335:
+              day=1;
+              month=12;
+              break;
+            case 366:
+              day=1;
+              month=1;
+              year++;
+              break;
+            default:
+              break;
+          }
+
+
+        }
+      }
+    }
+  }
+}
+
 /*======================================================================*/
 
 stMenuCmd list[] = {
@@ -218,7 +422,9 @@ stMenuCmd list[] = {
     {txt_set_p, 'p', do_set_p},
     {txt_set_tl, 't', do_set_tl},
     {txt_set_th, 'T', do_set_th},
-    {txt_display, 'd', do_display},
+    {txt_set_date, 'd',do_set_date},
+    {txt_display, 'm', do_display},
+    {txt_continous, 'c', [](){continous_display=(!continous_display);}},
     {txt_reset, 'r', [](){Serial.println();Serial.println("Resetting device...");
                                           delay(3000);
                                           resetFunc();}},
@@ -293,8 +499,9 @@ void loop()
     //lps331.getTemperature(tempLPS);
     //float tempHTS = HTS.readTemperature();
 
+    tsl.setUpALS();
 
-    if(illuminance>0.1){
+    if(illuminance>0.01){
       digitalWrite(LED_PIN, HIGH);
     }else{
       digitalWrite(LED_PIN, LOW);
@@ -313,13 +520,16 @@ void loop()
     lps331.getMeasurement(pressure);
     temperature = stlm75.readTemperatureC();
 
-    tsl.setUpALS();
-    delay(500);
+    do_time();
+
+    if(continous_display){
+      do_display();
+    }
+    
+    
     tsl.Measure_ALS();
     illuminance = tsl.tsl_alsData.L;
 
-  
-    
     
     //Serial.print("Luminance TSL25721: ");
     //Serial.print(luminance);
