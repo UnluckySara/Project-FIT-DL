@@ -5,27 +5,26 @@
 #include <TSL2571.h>
 #include "i2c.h"
 #include "i2c_LPS331.h"
+#include "RTClib.h"
 
 /*======================================================================*/
 
 TSL2571 tsl;
 LPS331 lps331;
 Generic_LM75 stlm75;
+RTC_DS1307 rtc;
 
 /*======================================================================*/
 
-bool start_screen = true;
 bool continous_display = false;
-String inputBuffer = "";
 float upper_temp_value = 30.0;
 float lower_temp_value = -5.0;
 float critical_pressure = 1000.0;
 float critical_humidity = 90.0;
 uint8_t CmdCode;
 float pressure, temperature, humidity, illuminance = {};
-char time_array[20];
-byte seconds, minutes, hours, day, month;
-uint16_t days, year;
+
+
 unsigned long prev_time = 0;
 
 /*======================================================================*/
@@ -79,7 +78,8 @@ void do_display(void)
 {
     Serial.println();
 
-    sprintf(time_array,"%02d:%02d:%02d %02d,%02d,%04d",hours,minutes,seconds,day,month,year);
+    char time_array[20];
+    sprintf(time_array,"%02d:%02d:%02d %02d,%02d,%04d",rtc.now().hour(),rtc.now().minute(),rtc.now().second(),rtc.now().day(),rtc.now().month(),rtc.now().year());
     Serial.println(time_array);
     
    
@@ -198,122 +198,129 @@ void do_set_th(void){
 
 }
 
-void do_set_date(void){
-  String aValue = "Enter hour";
 
-  if (menu.getStrValue(aValue) == false)
-  {
-    Serial.println("Entry failure");
-  }
-  else
-  {
-    hours = atof(aValue.c_str());
-  }
+bool isValidDate(int year, int month, int day, int hours, int minutes, int seconds) {
+    if (month < 1 || month > 12) return false;
 
-  aValue = "Enter minute";
+    int daysInMonth[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
 
-  if (menu.getStrValue(aValue) == false)
-  {
-    Serial.println("Entry failure");
-  }
-  else
-  {
-    minutes = atof(aValue.c_str());
-  }
+    if ((year % 4 == 0 && year % 100 != 0) || (year % 400 == 0)) {
+        daysInMonth[1] = 29; 
+    }
 
-  aValue = "Enter second";
+    if (day < 1 || day > daysInMonth[month - 1]) return false;
 
-  if (menu.getStrValue(aValue) == false)
-  {
-    Serial.println("Entry failure");
-  }
-  else
-  {
-    seconds = atof(aValue.c_str());
-  }
+    if (hours < 0 || hours > 23) return false;
+    if (minutes < 0 || minutes > 59) return false;
+    if (seconds < 0 || seconds > 59) return false;
 
-  aValue = "Enter year";
-
-  if (menu.getStrValue(aValue) == false)
-  {
-    Serial.println("Entry failure");
-  }
-  else
-  {
-    year = atof(aValue.c_str());
-  }
-
-  aValue = "Enter month";
-
-  if (menu.getStrValue(aValue) == false)
-  {
-    Serial.println("Entry failure");
-  }
-  else
-  {
-    month = atof(aValue.c_str());
-  }
-
-  aValue = "Enter day";
-
-  if (menu.getStrValue(aValue) == false)
-  {
-    Serial.println("Entry failure");
-  }
-  else
-  {
-    day = atof(aValue.c_str());
-  }
-
-  switch (month){
-    case 1:
-      days=day;
-      break;
-    case 2:
-      days=day+31;
-      break;
-    case 3:
-      days=day+59;
-      break;
-    case 4:
-      days=day+90;
-      break;
-    case 5:
-      days=day+120;
-      break;
-    case 6:
-      days=day+151;
-      break;
-    case 7:
-      days=day+181;
-      break;
-    case 8:
-      days=day+212;
-      break;
-    case 9:
-      days=day+243;
-      break;
-    case 10:
-      days=day+273;
-      break;
-    case 11:
-      days=day+304;
-      break;
-    case 12:
-      days=day+334;
-      break;
-    default:
-      break;
-  }
-  Serial.println();
-  Serial.println("Time set.");
-  Serial.println();
-
-  sprintf(time_array,"%02d:%02d:%02d %02d,%02d,%04d",hours,minutes,seconds,day,month,year);
-  Serial.println(time_array);
-
-  menu.giveCmdPrompt();
+    return true;
 }
+
+void do_set_date(void) {
+    String aValue;
+    int tempYear, tempMonth, tempDay, tempHours, tempMinutes, tempSeconds;
+    byte seconds, minutes, hours, day, month;
+    uint16_t days, year;
+
+
+    aValue = "Enter year:";
+    if (menu.getStrValue(aValue)) {
+        tempYear = atoi(aValue.c_str());
+    } else {
+        Serial.println("Invalid entry for year.");
+        menu.giveCmdPrompt();
+        return;
+    }
+
+    aValue = "Enter month:";
+    if (menu.getStrValue(aValue)) {
+        tempMonth = atoi(aValue.c_str());
+    } else {
+        Serial.println("Invalid entry for month.");
+        menu.giveCmdPrompt();
+        return;
+    }
+
+    aValue = "Enter day:";
+    if (menu.getStrValue(aValue)) {
+        tempDay = atoi(aValue.c_str());
+    } else {
+        Serial.println("Invalid entry for day.");
+        menu.giveCmdPrompt();
+        return;
+    }
+
+    aValue = "Enter hour:";
+    if (menu.getStrValue(aValue)) {
+        tempHours = atoi(aValue.c_str());
+    } else {
+        Serial.println("Invalid entry for hour.");
+        menu.giveCmdPrompt();
+        return;
+    }
+
+    aValue = "Enter minute:";
+    if (menu.getStrValue(aValue)) {
+        tempMinutes = atoi(aValue.c_str());
+    } else {
+        Serial.println("Invalid entry for minute.");
+        menu.giveCmdPrompt();
+        return;
+    }
+
+    aValue = "Enter second:";
+    if (menu.getStrValue(aValue)) {
+        tempSeconds = atoi(aValue.c_str());
+    } else {
+        Serial.println("Invalid entry for second.");
+        menu.giveCmdPrompt();
+        return;
+    }
+
+    if (!isValidDate(tempYear, tempMonth, tempDay, tempHours, tempMinutes, tempSeconds)) {
+        Serial.println("\nInvalid date or time entered. Please try again.");
+        menu.giveCmdPrompt();
+        return;
+    }
+
+    year = tempYear;
+    month = tempMonth;
+    day = tempDay;
+    hours = tempHours;
+    minutes = tempMinutes;
+    seconds = tempSeconds;
+    
+
+    switch (month) {
+        case 1: days = day; break;
+        case 2: days = day + 31; break;
+        case 3: days = day + 59; break;
+        case 4: days = day + 90; break;
+        case 5: days = day + 120; break;
+        case 6: days = day + 151; break;
+        case 7: days = day + 181; break;
+        case 8: days = day + 212; break;
+        case 9: days = day + 243; break;
+        case 10: days = day + 273; break;
+        case 11: days = day + 304; break;
+        case 12: days = day + 334; break;
+        default: break;
+    }
+    prev_time = millis();
+    Serial.println("\nTime set successfully:");
+
+    rtc.adjust(DateTime(year,month,day,hours,minutes,seconds));
+    char time_array[20];
+    sprintf(time_array, "%02d:%02d:%02d %02d,%02d,%04d", hours, minutes, seconds, day, month, year);
+    Serial.println(time_array);
+
+    menu.giveCmdPrompt();
+}
+
+
+
+
 
 bool temp_check(void){
   if(lower_temp_value > upper_temp_value){
@@ -337,81 +344,41 @@ bool temp_check(void){
   }
 }
 
-void do_time(void){
-  if(millis() >= prev_time){
-    prev_time = prev_time + 1000;
-    seconds++;
-    if(seconds == 60){
-      seconds = 0;
-      minutes++;
-      if(minutes ==60){
-        minutes = 0;
-        hours++;
-        if(hours==24){
-          hours = 1;
-          days++;
+/*void do_time(void) {
+    if (millis() - prev_time >= 1000) {
+        prev_time = millis();
+        seconds++;
 
+        if (seconds == 60) {
+            seconds = 0;
+            minutes++;
+            if (minutes == 60) {
+                minutes = 0;
+                hours++;
+                if (hours == 24) {
+                    hours = 0;
+                    day++;
 
-          switch (days){
-            case 32:
-              day=1;
-              month=2;
-              break;
-            case 60:
-              day=1;
-              month=3;
-              break;
-            case 91:
-              day=1;
-              month=4;
-              break;
-            case 121:
-              day=1;
-              month=5;
-              break;
-            case 152:
-              day=1;
-              month=6;
-              break;
-            case 182:
-              day=1;
-              month=7;
-              break;
-            case 213:
-              day=1;
-              month=8;
-              break;
-            case 244:
-              day=1;
-              month=9;
-              break;
-            case 274:
-              day=1;
-              month=10;
-              break;
-            case 305:
-              day=1;
-              month=11;
-              break;
-            case 335:
-              day=1;
-              month=12;
-              break;
-            case 366:
-              day=1;
-              month=1;
-              year++;
-              break;
-            default:
-              break;
-          }
+                    int daysInMonth[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
 
+                    if ((year % 4 == 0 && year % 100 != 0) || (year % 400 == 0)) {
+                        daysInMonth[1] = 29; 
+                    }
 
+                    if (day > daysInMonth[month - 1]) {
+                        day = 1;
+                        month++;
+
+                        if (month > 12) {
+                            month = 1;
+                            year++;
+                        }
+                    }
+                }
+            }
         }
-      }
     }
-  }
-}
+}*/
 
 /*======================================================================*/
 
@@ -444,6 +411,7 @@ stMenuCmd list[] = {
 
 void setup()
 {
+    
     pinMode(LED_PIN, OUTPUT);
 
 
@@ -475,6 +443,17 @@ void setup()
       Serial.println("HTS found!");
     }
 
+    if (! rtc.begin()) {
+    Serial.println("Couldn't find RTC");
+    Serial.flush();
+    while (1);
+    }
+
+    if (! rtc.isrunning()) {
+    Serial.println("RTC is NOT running, let's set the time!");
+      do_set_date();
+    }
+
     tsl.getAddr_TSL2571(TSL2571_DEFAULT_ADDRESS);
     tsl.begin();
 
@@ -490,15 +469,6 @@ void setup()
  
 void loop()
 { 
-  /*if(start_screen)
-  {
-    Title_Window();
-  }
-  else
-  {*/
-    //lps331.getTemperature(tempLPS);
-    //float tempHTS = HTS.readTemperature();
-
     tsl.setUpALS();
 
     if(illuminance>0.01){
@@ -513,142 +483,22 @@ void loop()
     {
       menu.ExeCommand(CmdCode);
     }
-
-
-
-    humidity = HTS.readHumidity();
-    lps331.getMeasurement(pressure);
-    temperature = stlm75.readTemperatureC();
-
-    do_time();
-
-    if(continous_display){
-      do_display();
-    }
-    
-    
-    tsl.Measure_ALS();
-    illuminance = tsl.tsl_alsData.L;
-
-    
-    //Serial.print("Luminance TSL25721: ");
-    //Serial.print(luminance);
-    //Serial.println(" lux");
-    
-    //Serial.print("Temperature HTS221: ");
-    //Serial.print(tempHTS);
-    //Serial.println(" C");
-
-    //Serial.print("Temperature LPS331: ");
-    //Serial.print(tempLPS);
-    //Serial.println(" C");
-
-
-    /*Serial.println();
-    if (Serial.available() > 0)
-  {
-    start_screen = true;
-    Serial.println("Press twice on the space.");
-  }
-   delay(1000);
-   start_screen=true;
-  }*/
+ 
   
+     humidity = HTS.readHumidity();
+     lps331.getMeasurement(pressure);
+     temperature = stlm75.readTemperatureC();
+  
+     //do_time();
+  
+     if(continous_display)
+     {
+        do_display();
+     }
+      
+      
+     tsl.Measure_ALS();
+     illuminance = tsl.tsl_alsData.L;
+    
     
 }
-
-
-
-
-/*
-void Title_Window()
-{
-   if (Serial.available() > 0) 
-    { 
-      
-      String input = Serial.readStringUntil('\n'); 
-      if (input.equals("?")||input.equals(" "))
-      {    
-          Serial.println();
-          Serial.println("Welcome to the configuration window.");
-          Serial.println();
-          
-          Serial.println("Current settings:");
-          Serial.print("Critical value humidity: ");
-          Serial.print(critical_humidity);
-          Serial.println(" %");
-          Serial.print("Critical value pressure: ");
-          Serial.print(critical_pressure);
-          Serial.println(" mbar");
-          Serial.print("Lower critical temperature value: ");
-          Serial.print(lower_temp_value);
-          Serial.println(" C");
-          Serial.print("Upper critical temperature value: ");
-          Serial.print(upper_temp_value);
-          Serial.println(" C");
-          Serial.println();
-
-          Serial.println("Options:");
-          Serial.println("h <value> - set critical value humidity.");
-          Serial.println("p <value> - set critical value pressure.");
-          Serial.println("tl <value> - set lower critical temperature value.");
-          Serial.println("th <value> - set upper critical temperature value.");
-          Serial.println("reset - device reset.");
-          Serial.println("start - do the measurement.");   
-      }
-
-      if (input.equals("start")) 
-      {
-        Serial.println();
-        Serial.println("Starting sensor data display...");
-        start_screen = false; 
-      } 
-      else if (input.startsWith("h ")) 
-      {
-        String valueStr = input.substring(2);
-        critical_humidity = valueStr.toFloat();
-        Serial.print("Set critical humidity to: ");
-        Serial.print(critical_humidity);
-        Serial.println(" %");
-      }
-      else if (input.startsWith("p ")) 
-      {
-         String valueStr = input.substring(2);
-         critical_pressure = valueStr.toFloat();
-         Serial.print("Set critical pressure to: ");
-         Serial.print(critical_pressure);
-         Serial.println(" mbar");
-        } 
-        else if (input.startsWith("tl "))
-        { 
-          String valueStr = input.substring(3);
-          lower_temp_value = valueStr.toFloat();
-          Serial.print("Set lower critical temperature to: ");
-          Serial.print(lower_temp_value);
-          Serial.println(" C");
-        } 
-        else if (input.startsWith("th "))
-        { 
-          String valueStr = input.substring(3);
-          upper_temp_value = valueStr.toFloat();
-          Serial.print("Set upper critical temperature to: ");
-          Serial.print(upper_temp_value);
-          Serial.println(" C");
-        } 
-        else if (input.equals("reset")) 
-        {
-            Serial.println("Resetting device...");
-            delay(5000);
-            resetFunc();
-        }
-        else 
-        {
-            Serial.println("Invalid command. Please try again.");
-        }
-      
-    }
-   
-}*/
-
-
-
