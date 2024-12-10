@@ -5,10 +5,11 @@ Project FIT in ALICE. As part of the project, we decided to create environmental
 ## Table of Contents
 
 - [Requirements](#requirements)
+- [Schematic](#schematic)
 - [Project Progress](#project-progress)
 - [Documentation](#documentation)
 - [Authors](#authors)
-- [Schematic](#schematic)
+
 
 ## Requirements
 
