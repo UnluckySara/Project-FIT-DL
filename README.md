@@ -8,12 +8,18 @@ Project FIT in ALICE. As part of the project, we decided to create environmental
 - [Project Progress](#project-progress)
 - [Documentation](#documentation)
 - [Authors](#authors)
+- [Schematic](#schematic)
 
 ## Requirements
 
 - KA-Nucleo-Weather
 - Arduino or a similar microcontroller
-  
+- RTC DS1307
+
+## Schematic
+
+![schematic](https://github.com/user-attachments/assets/793490b5-b954-4882-baa3-dd32a2072cac)
+
 ## Project Progress
 
 - Week: October 17-24, 2024:
@@ -31,6 +37,11 @@ Project FIT in ALICE. As part of the project, we decided to create environmental
   2. LED alert when light detected.
   3. Protection against user trying to put bad data to critical values.
   4. Some of code cleanup
+- November 29, 2024 - December 5, 2024:
+  1. Added time measurement.
+  2. Testing accuracy of time measurement.
+- November 6, 2024 - November 11, 2024:
+  1. Switched to measuring time with RTC DS1307
 
 
 ## Documentation
