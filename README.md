@@ -19,7 +19,8 @@ Project FIT in ALICE. As part of the project, we decided to create environmental
 
 ## Schematic
 
-![schematic](https://github.com/user-attachments/assets/793490b5-b954-4882-baa3-dd32a2072cac)
+![schematic](https://github.com/user-attachments/assets/b62ce9ff-db1e-483a-af4f-98ebcae9680c)
+
 
 ## Project Progress
 
