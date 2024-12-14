@@ -23,15 +23,19 @@ float critical_pressure = 1000.0;
 float critical_humidity = 90.0;
 uint8_t CmdCode;
 float pressure, temperature, humidity, illuminance = {};
+bool LEDR_STATE= LOW;
+bool LEDG_STATE= LOW;
 
+bool alert = false;
 
-unsigned long prev_time = 0;
+unsigned long prev_millis = 0;
+
 
 /*======================================================================*/
 
 SerialMenuCmd menu;
 
-tMenuCmdTxt txt_welcome[] = "\nWelcome to the configuration window.\n";
+tMenuCmdTxt txt_welcome[] = "Welcome to the configuration window.\n";
 tMenuCmdTxt txt_values[] = "s - display current settings.";
 tMenuCmdTxt txt_set_h[] = "h - set critical value humidity.";
 tMenuCmdTxt txt_set_p[] = "p - set critical value pressure.";
@@ -39,9 +43,9 @@ tMenuCmdTxt txt_set_tl[] = "t - set lower critical temperature value.";
 tMenuCmdTxt txt_set_th[] = "T - set higher critical temperature value.";
 tMenuCmdTxt txt_reset[] = "r - reset device.";
 tMenuCmdTxt txt_display[] = "m - display last measurement.";
-tMenuCmdTxt txt_set_date[] = "d - set current date";
+tMenuCmdTxt txt_set_date[] = "d - set current date.";
 tMenuCmdTxt txt_continous[] = "c - toggle continous measurement display.";
-
+tMenuCmdTxt txt_clear_alert[] = "a - clear alert.";
 tMenuCmdTxt txt5_DisplayMenu[] = "? - Display menu.";
 
 tMenuCmdTxt txt_Prompt[] = "";
@@ -49,7 +53,8 @@ tMenuCmdTxt txt_Prompt[] = "";
 /*======================================================================*/
 
 #define NbCmds sizeof(list) / sizeof(stMenuCmd)
-#define LED_PIN 13
+#define LEDR_PIN 13
+#define LEDG_PIN 12
 
 /*======================================================================*/
 void(* resetFunc) (void) = 0;
@@ -83,19 +88,19 @@ void do_display(void)
     Serial.println(time_array);
     
    
-    Serial.print("Humidity HTS221: ");
+    Serial.print("Humidity: ");
     Serial.print(humidity);
     Serial.println(" %");
 
-    Serial.print("Pressure LPS331: ");
+    Serial.print("Pressure: ");
     Serial.print(pressure);
     Serial.println(" mbar");
 
-    Serial.print("Temperature STLM75: ");
+    Serial.print("Temperature: ");
     Serial.print(temperature);
     Serial.println(" C");
 
-    Serial.print("Illuminance TSL2571: ");
+    Serial.print("Illuminance: ");
     Serial.print(illuminance,4);
     Serial.println(" lux");
 
@@ -221,7 +226,7 @@ void do_set_date(void) {
     String aValue;
     int tempYear, tempMonth, tempDay, tempHours, tempMinutes, tempSeconds;
     byte seconds, minutes, hours, day, month;
-    uint16_t days, year;
+    uint16_t year;
 
 
     aValue = "Enter year:";
@@ -292,22 +297,7 @@ void do_set_date(void) {
     seconds = tempSeconds;
     
 
-    switch (month) {
-        case 1: days = day; break;
-        case 2: days = day + 31; break;
-        case 3: days = day + 59; break;
-        case 4: days = day + 90; break;
-        case 5: days = day + 120; break;
-        case 6: days = day + 151; break;
-        case 7: days = day + 181; break;
-        case 8: days = day + 212; break;
-        case 9: days = day + 243; break;
-        case 10: days = day + 273; break;
-        case 11: days = day + 304; break;
-        case 12: days = day + 334; break;
-        default: break;
-    }
-    prev_time = millis();
+    
     Serial.println("\nTime set successfully:");
 
     rtc.adjust(DateTime(year,month,day,hours,minutes,seconds));
@@ -392,12 +382,15 @@ stMenuCmd list[] = {
     {txt_set_date, 'd',do_set_date},
     {txt_display, 'm', do_display},
     {txt_continous, 'c', [](){continous_display=(!continous_display);}},
-    {txt_reset, 'r', [](){Serial.println();Serial.println("Resetting device...");
-                                          delay(3000);
-                                          resetFunc();}},
+    {txt_reset, 'r', [](){Serial.println();
+                          Serial.println("Resetting device...");
+                          delay(3000);
+                          resetFunc();}},
 
     {txt5_DisplayMenu, '?', []() { menu.ShowMenu();
-                                   menu.giveCmdPrompt();}}
+                                   menu.giveCmdPrompt();}},
+    {txt_clear_alert,'a',[](){alert=0;
+                              menu.giveCmdPrompt();}}
     };
 
 
@@ -412,10 +405,10 @@ stMenuCmd list[] = {
 void setup()
 {
     
-    pinMode(LED_PIN, OUTPUT);
+    pinMode(LEDR_PIN, OUTPUT);
+    pinMode(LEDG_PIN, OUTPUT);
 
-
-    Serial.begin(9600); 
+    Serial.begin(115200); 
     Wire.begin();
 
     if (menu.begin(list, NbCmds, txt_Prompt) == false)
@@ -431,13 +424,13 @@ void setup()
     } 
     else
     {
-        Serial.println("Sensor missing");
+        Serial.println("LPS missing");
         while(1);
     }
 
     if (!HTS.begin()) 
     {
-      Serial.println("Sensor missing");
+      Serial.println("HTS missing");
       while (1);
     }else{
       Serial.println("HTS found!");
@@ -445,8 +438,9 @@ void setup()
 
     if (! rtc.begin()) {
     Serial.println("Couldn't find RTC");
-    Serial.flush();
     while (1);
+    } else {
+      Serial.println("RTC found!");
     }
 
     if (! rtc.isrunning()) {
@@ -455,6 +449,7 @@ void setup()
     }
 
     tsl.getAddr_TSL2571(TSL2571_DEFAULT_ADDRESS);
+
     tsl.begin();
 
     delay(1000);
@@ -470,12 +465,30 @@ void setup()
 void loop()
 { 
     tsl.setUpALS();
+    unsigned long curr_millis = millis();
 
-    if(illuminance>0.01){
-      digitalWrite(LED_PIN, HIGH);
+    int interval = 1000;
+
+
+
+    if(alert){
+      if(curr_millis - prev_millis > interval){
+        LEDR_STATE=!LEDR_STATE;
+      }
+    }else if(illuminance>0.01){
+      LEDR_STATE=HIGH;
     }else{
-      digitalWrite(LED_PIN, LOW);
+      LEDR_STATE=LOW;
     }
+
+    if(curr_millis - prev_millis > interval){
+        LEDG_STATE=!LEDG_STATE;
+        prev_millis = curr_millis;
+    }
+
+    digitalWrite(LEDG_PIN, LEDG_STATE);
+    digitalWrite(LEDR_PIN, LEDR_STATE);
+
 
     CmdCode = menu.UserRequest();
 
@@ -485,16 +498,22 @@ void loop()
     }
  
   
-     humidity = HTS.readHumidity();
-     lps331.getMeasurement(pressure);
-     temperature = stlm75.readTemperatureC();
-  
+    humidity = HTS.readHumidity();
+    lps331.getMeasurement(pressure);
+    temperature = stlm75.readTemperatureC();
+
+    if((temperature>upper_temp_value)||(temperature<lower_temp_value)||(pressure>critical_pressure)||(humidity>critical_humidity)){
+      alert=1;
+    }
+
      //do_time();
   
-     if(continous_display)
-     {
-        do_display();
-     }
+    if(continous_display)
+    {
+      Serial.write(12);
+      do_display();
+        
+    }
       
       
      tsl.Measure_ALS();
