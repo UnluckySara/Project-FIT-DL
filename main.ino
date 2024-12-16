@@ -6,9 +6,21 @@
 #include "i2c.h"
 #include "i2c_LPS331.h"
 #include "RTClib.h"
+/*======================================================================*/
+
+// Define LED pins and command count
+#define NbCmds sizeof(list) / sizeof(stMenuCmd)
+#define LEDR_PIN 13
+#define LEDG_PIN 12
+
+// EEPROM CONFIG 
+#define EEPROM_I2C_ADDRESS 0x50
+#define EEPROM_WRITE_DELAY 5
+#define EEPROM_START_ADDRESS 0x0001 // Adres startowy w EEPROM
 
 /*======================================================================*/
 
+// Sensor and peripheral objects
 TSL2571 tsl;
 LPS331 lps331;
 Generic_LM75 stlm75;
@@ -16,23 +28,34 @@ RTC_DS1307 rtc;
 
 /*======================================================================*/
 
-bool continous_display = false;
-float upper_temp_value = 30.0;
-float lower_temp_value = -5.0;
-float critical_pressure = 1000.0;
-float critical_humidity = 90.0;
+// Configuration settings
 uint8_t CmdCode;
+unsigned long prev_millis = 0;
 float pressure, temperature, humidity, illuminance = {};
+
+bool continous_display = false;
 bool LEDR_STATE= LOW;
 bool LEDG_STATE= LOW;
 
-bool alert = false;
+struct ConfigData {
+  float upper_temp_value;
+  float lower_temp_value;
+  float critical_pressure;
+  float critical_humidity;
+  bool alert;
+};
 
-unsigned long prev_millis = 0;
-
+ConfigData config = {
+  .upper_temp_value = 30.0,
+  .lower_temp_value = -5.0,
+  .critical_pressure = 1000.0,
+  .critical_humidity = 90.0,
+  .alert = false
+};
 
 /*======================================================================*/
 
+// Menu configuration
 SerialMenuCmd menu;
 
 tMenuCmdTxt txt_welcome[] = "Welcome to the configuration window.\n";
@@ -46,39 +69,103 @@ tMenuCmdTxt txt_display[] = "m - display last measurement.";
 tMenuCmdTxt txt_set_date[] = "d - set current date.";
 tMenuCmdTxt txt_continous[] = "c - toggle continous measurement display.";
 tMenuCmdTxt txt_clear_alert[] = "a - clear alert.";
+tMenuCmdTxt txt_eeprom_save[] = "e - save configuration to EEPROM.";
+tMenuCmdTxt txt_eeprom_load[] = "E - load configuration from EEPROM.";
 tMenuCmdTxt txt5_DisplayMenu[] = "? - Display menu.";
 
 tMenuCmdTxt txt_Prompt[] = "";
 
 /*======================================================================*/
 
-#define NbCmds sizeof(list) / sizeof(stMenuCmd)
-#define LEDR_PIN 13
-#define LEDG_PIN 12
-
-/*======================================================================*/
+// Function pointer for reset
 void(* resetFunc) (void) = 0;
 
+/*======================================================================*/
+
+//EEPROME support functions
+
+void saveConfigToEEPROM() 
+{
+  Serial.println();
+  Serial.println("Saving configuration to EEPROM...");
+  
+  Wire.beginTransmission(EEPROM_I2C_ADDRESS);
+  Wire.write(highByte(EEPROM_START_ADDRESS)); 
+  Wire.write(lowByte(EEPROM_START_ADDRESS)); 
+
+  byte* dataPtr = (byte*)&config;
+  for (int i = 0; i < sizeof(ConfigData); i++) 
+  {
+    Wire.write(dataPtr[i]);
+  }
+
+  byte status = Wire.endTransmission();
+  if (status != 0) 
+  {
+    Serial.println("Failed to write to EEPROM!");
+    return;
+  }
+
+  delay(EEPROM_WRITE_DELAY);
+  Serial.println("Configuration saved successfully!");
+}
+
+void loadConfigFromEEPROM() 
+{
+  Serial.println();
+  Serial.println("Loading configuration from EEPROM...");
+
+  Wire.beginTransmission(EEPROM_I2C_ADDRESS);
+  Wire.write(highByte(EEPROM_START_ADDRESS)); 
+  Wire.write(lowByte(EEPROM_START_ADDRESS));
+  Wire.endTransmission();
+
+  Wire.requestFrom(EEPROM_I2C_ADDRESS, sizeof(ConfigData));
+  if (Wire.available() == sizeof(ConfigData)) 
+  {
+    byte* dataPtr = (byte*)&config;
+    for (int i = 0; i < sizeof(ConfigData); i++) 
+    {
+      dataPtr[i] = Wire.read();
+    }
+    Serial.println("Configuration loaded successfully!");
+  } else {
+    Serial.println("Failed to read from EEPROM!");
+  }  
+  Serial.print("Critical Humidity: ");
+  Serial.println(config.critical_humidity);
+  Serial.print("Critical Pressure: ");
+  Serial.println(config.critical_pressure); 
+  Serial.print("Lower Temperature Value: ");
+  Serial.println(config.lower_temp_value);
+  Serial.print("Upper Temperature Value: ");
+  Serial.println(config.upper_temp_value);
+}
+
+/*======================================================================*/
+// Functions to handle menu commands and functionality
+
+// Display current settings
 void do_settings(void){
     Serial.println();
     Serial.println("Current settings:");
     Serial.print("Critical value humidity: ");
-    Serial.print(critical_humidity);
+    Serial.print(config.critical_humidity);
     Serial.println(" %");
     Serial.print("Critical value pressure: ");
-    Serial.print(critical_pressure);
+    Serial.print(config.critical_pressure);
     Serial.println(" mbar");
     Serial.print("Lower critical temperature value: ");
-    Serial.print(lower_temp_value);
+    Serial.print(config.lower_temp_value);
     Serial.println(" C");
     Serial.print("Upper critical temperature value: ");
-    Serial.print(upper_temp_value);
+    Serial.print(config.upper_temp_value);
     Serial.println(" C");
 
     menu.giveCmdPrompt();
 }
 
-
+// Display measurements
 void do_display(void)
 {
     Serial.println();
@@ -87,7 +174,6 @@ void do_display(void)
     sprintf(time_array,"%02d:%02d:%02d %02d,%02d,%04d",rtc.now().hour(),rtc.now().minute(),rtc.now().second(),rtc.now().day(),rtc.now().month(),rtc.now().year());
     Serial.println(time_array);
     
-   
     Serial.print("Humidity: ");
     Serial.print(humidity);
     Serial.println(" %");
@@ -107,65 +193,60 @@ void do_display(void)
     menu.giveCmdPrompt();
 }
 
+// Update critical humidity value
 void do_set_h(void){
   String aValue = "Enter critical humidity value";
 
   if (menu.getStrValue(aValue) == false)
   {
-
     Serial.println("Entry failure");
   }
   else
   {
     Serial.println();
-
-    critical_humidity = atof(aValue.c_str());
+    config.critical_humidity = atof(aValue.c_str());
     Serial.print("Critical value humidity: ");
-    Serial.print(critical_humidity);
+    Serial.print(config.critical_humidity);
     Serial.println(" %");
   }
 
   menu.giveCmdPrompt();
-
 }
 
+// Update critical pressure value
 void do_set_p(void){
   String aValue = "Enter critical pressure value";
 
   if (menu.getStrValue(aValue) == false)
   {
-
     Serial.println("Entry failure");
   }
   else
   {
     Serial.println();
-
-    critical_pressure = atof(aValue.c_str());
+    config.critical_pressure = atof(aValue.c_str());
     Serial.print("Critical pressure value: ");
-    Serial.print(critical_pressure);
+    Serial.print(config.critical_pressure);
     Serial.println(" mbar");
   }
 
   menu.giveCmdPrompt();
-
 }
 
+// Update lower critical temperature value
 void do_set_tl(void){
   String aValue = "Enter lower critical temperature value";
 
   if (menu.getStrValue(aValue) == false)
   {
-
     Serial.println("Entry failure");
   }
   else
   {
     Serial.println();
-
-    lower_temp_value = atof(aValue.c_str());
+    config.lower_temp_value = atof(aValue.c_str());
     Serial.print("Lower critical value temperature: ");
-    Serial.print(lower_temp_value);
+    Serial.print(config.lower_temp_value);
     Serial.println(" C");
   }
 
@@ -177,21 +258,20 @@ void do_set_tl(void){
 
 }
 
+// Update upper critical temperature value
 void do_set_th(void){
   String aValue = "Enter upper critical temperature value";
 
   if (menu.getStrValue(aValue) == false)
   {
-
     Serial.println("Entry failure");
   }
   else
   {
     Serial.println();
-
-    upper_temp_value = atof(aValue.c_str());
+    config.upper_temp_value = atof(aValue.c_str());
     Serial.print("Upper critical value temperature: ");
-    Serial.print(upper_temp_value);
+    Serial.print(config.upper_temp_value);
     Serial.println(" C");
   }
   
@@ -200,7 +280,6 @@ void do_set_th(void){
   } else {
     do_set_th();
   }
-
 }
 
 
@@ -222,12 +301,12 @@ bool isValidDate(int year, int month, int day, int hours, int minutes, int secon
     return true;
 }
 
+// Validate and set date
 void do_set_date(void) {
     String aValue;
     int tempYear, tempMonth, tempDay, tempHours, tempMinutes, tempSeconds;
     byte seconds, minutes, hours, day, month;
     uint16_t year;
-
 
     aValue = "Enter year:";
     if (menu.getStrValue(aValue)) {
@@ -296,8 +375,6 @@ void do_set_date(void) {
     minutes = tempMinutes;
     seconds = tempSeconds;
     
-
-    
     Serial.println("\nTime set successfully:");
 
     rtc.adjust(DateTime(year,month,day,hours,minutes,seconds));
@@ -308,12 +385,9 @@ void do_set_date(void) {
     menu.giveCmdPrompt();
 }
 
-
-
-
-
+// Check if temperature values are valid
 bool temp_check(void){
-  if(lower_temp_value > upper_temp_value){
+  if(config.lower_temp_value > config.upper_temp_value){
     Serial.println();
     Serial.println("Error!!!");
     Serial.println();
@@ -321,10 +395,10 @@ bool temp_check(void){
     Serial.println("Values you are trying to set:");
     Serial.println();
     Serial.print("Lower critical value temperature: ");
-    Serial.print(lower_temp_value);
+    Serial.print(config.lower_temp_value);
     Serial.println(" C");
     Serial.print("Upper critical value temperature: ");
-    Serial.print(upper_temp_value);
+    Serial.print(config.upper_temp_value);
     Serial.println(" C");
     Serial.println();
     Serial.println("Try again.");
@@ -334,6 +408,7 @@ bool temp_check(void){
   }
 }
 
+/*======================================================================*/
 /*void do_time(void) {
     if (millis() - prev_time >= 1000) {
         prev_time = millis();
@@ -370,8 +445,10 @@ bool temp_check(void){
     }
 }*/
 
+
 /*======================================================================*/
 
+// Menu command structure
 stMenuCmd list[] = {
     {txt_welcome},
     {txt_values, 's', do_settings},
@@ -381,6 +458,8 @@ stMenuCmd list[] = {
     {txt_set_th, 'T', do_set_th},
     {txt_set_date, 'd',do_set_date},
     {txt_display, 'm', do_display},
+    {txt_eeprom_save, 'e', saveConfigToEEPROM},
+    {txt_eeprom_load, 'E', loadConfigFromEEPROM},
     {txt_continous, 'c', [](){continous_display=(!continous_display);}},
     {txt_reset, 'r', [](){Serial.println();
                           Serial.println("Resetting device...");
@@ -389,22 +468,15 @@ stMenuCmd list[] = {
 
     {txt5_DisplayMenu, '?', []() { menu.ShowMenu();
                                    menu.giveCmdPrompt();}},
-    {txt_clear_alert,'a',[](){alert=0;
+     {txt_clear_alert,'a',[](){config.alert=0;
                               menu.giveCmdPrompt();}}
+    
     };
-
-
-
 /*======================================================================*/
 
-
-/*======================================================================*/
-
-
-
+// Setup and initialization
 void setup()
 {
-    
     pinMode(LEDR_PIN, OUTPUT);
     pinMode(LEDG_PIN, OUTPUT);
 
@@ -416,8 +488,6 @@ void setup()
       while (true);
     }
     
-
-
     if (lps331.initialize())
     {
       Serial.println("LPS found!");
@@ -453,25 +523,19 @@ void setup()
     tsl.begin();
 
     delay(1000);
-
-
+    
     menu.ShowMenu();
     menu.giveCmdPrompt();
-
-
-
 }
- 
+
+// Main loop
 void loop()
 { 
     tsl.setUpALS();
     unsigned long curr_millis = millis();
-
     int interval = 1000;
 
-
-
-    if(alert){
+    if(config.alert){
       if(curr_millis - prev_millis > interval){
         LEDR_STATE=!LEDR_STATE;
       }
@@ -489,7 +553,6 @@ void loop()
     digitalWrite(LEDG_PIN, LEDG_STATE);
     digitalWrite(LEDR_PIN, LEDR_STATE);
 
-
     CmdCode = menu.UserRequest();
 
     if (CmdCode != 0)
@@ -502,19 +565,18 @@ void loop()
     lps331.getMeasurement(pressure);
     temperature = stlm75.readTemperatureC();
 
-    if((temperature>upper_temp_value)||(temperature<lower_temp_value)||(pressure>critical_pressure)||(humidity>critical_humidity)){
-      alert=1;
+    if((temperature>config.upper_temp_value)||(temperature<config.lower_temp_value)||(pressure>config.critical_pressure)||(humidity>config.critical_humidity)){
+      config.alert=1;
     }
-
-     //do_time();
-  
+    
+    //do_time();
+    
     if(continous_display)
     {
       Serial.write(12);
       do_display();
         
     }
-      
       
      tsl.Measure_ALS();
      illuminance = tsl.tsl_alsData.L;
