@@ -16,7 +16,10 @@
 // EEPROM CONFIG 
 #define EEPROM_I2C_ADDRESS 0x50
 #define EEPROM_WRITE_DELAY 5
-#define EEPROM_START_ADDRESS 0x0001 // Adres startowy w EEPROM
+#define EEPROM_START_ADDRESS 0x0001 
+#define EEPROM_SENSOR_START_ADDRESS 0x16  
+#define EEPROM_SENSOR_END_ADDRESS 0x7D00
+
 
 /*======================================================================*/
 
@@ -71,6 +74,7 @@ tMenuCmdTxt txt_continous[] = "c - toggle continous measurement display.";
 tMenuCmdTxt txt_clear_alert[] = "a - clear alert.";
 tMenuCmdTxt txt_eeprom_save[] = "e - save configuration to EEPROM.";
 tMenuCmdTxt txt_eeprom_load[] = "E - load configuration from EEPROM.";
+tMenuCmdTxt txt_eeprom_load_data[] = "D - load data from EEPROM.";
 tMenuCmdTxt txt5_DisplayMenu[] = "? - Display menu.";
 
 tMenuCmdTxt txt_Prompt[] = "";
@@ -79,6 +83,113 @@ tMenuCmdTxt txt_Prompt[] = "";
 
 // Function pointer for reset
 void(* resetFunc) (void) = 0;
+
+/*======================================================================*/
+void saveSensorDataToEEPROM(float temp, float humidity, float pressure, float illuminance, uint16_t startAddress, uint16_t endAddress) 
+{
+  uint16_t currentAddress = startAddress;
+  
+  while (!isAddressEmpty(currentAddress)) 
+  {
+    currentAddress += sizeof(float) * 4;
+    if (currentAddress >= endAddress) 
+    {
+      currentAddress = startAddress;
+    }
+  }
+
+  Wire.beginTransmission(EEPROM_I2C_ADDRESS);
+  Wire.write(highByte(currentAddress));
+  Wire.write(lowByte(currentAddress));
+
+  byte *data = (byte*)&temp;
+  for (int i = 0; i < sizeof(float); i++) Wire.write(data[i]);
+  data = (byte*)&humidity;
+  for (int i = 0; i < sizeof(float); i++) Wire.write(data[i]);
+  data = (byte*)&pressure;
+  for (int i = 0; i < sizeof(float); i++) Wire.write(data[i]);
+  data = (byte*)&illuminance;
+  for (int i = 0; i < sizeof(float); i++) Wire.write(data[i]);
+
+  if (Wire.endTransmission() != 0) 
+  {
+    Serial.println("Failed to write sensor data to EEPROM!");
+    return;
+  }
+
+  delay(EEPROM_WRITE_DELAY);
+  Serial.println("Sensor data saved to EEPROM!");
+}
+
+void readSensorDataFromEEPROM(uint16_t startAddress) 
+{
+  Serial.println();
+  Serial.println("Reading sensor data from EEPROM...");
+  uint16_t currentAddress = startAddress;
+
+  while (currentAddress < EEPROM_SENSOR_END_ADDRESS) 
+  {
+    if (isAddressEmpty(currentAddress)) 
+    {
+      Serial.println("End of data found.");
+      break;
+    }
+
+    float temp, humidity, pressure, illuminance;
+    Wire.beginTransmission(EEPROM_I2C_ADDRESS);
+    Wire.write(highByte(currentAddress));
+    Wire.write(lowByte(currentAddress));
+    Wire.endTransmission();
+
+    Wire.requestFrom(EEPROM_I2C_ADDRESS, sizeof(float) * 4);
+    if (Wire.available() == sizeof(float) * 4) 
+    {
+      byte *data = (byte*)&temp;
+      for (int i = 0; i < sizeof(float); i++) data[i] = Wire.read();
+      data = (byte*)&humidity;
+      for (int i = 0; i < sizeof(float); i++) data[i] = Wire.read();
+      data = (byte*)&pressure;
+      for (int i = 0; i < sizeof(float); i++) data[i] = Wire.read();
+      data = (byte*)&illuminance;
+      for (int i = 0; i < sizeof(float); i++) data[i] = Wire.read();
+
+      Serial.println();      
+      Serial.print("Humidity: ");
+      Serial.print(humidity);
+      Serial.println(" %");
+  
+      Serial.print("Pressure: ");
+      Serial.print(pressure);
+      Serial.println(" mbar");
+  
+      Serial.print("Temperature: ");
+      Serial.print(temp);
+      Serial.println(" C");
+  
+      Serial.print("Illuminance: ");
+      Serial.print(illuminance);
+      Serial.println(" lux");
+
+      currentAddress += sizeof(float) * 4;
+    } 
+    else 
+    {
+      Serial.println("Error reading data from EEPROM");
+      break;
+    }
+  }
+}
+
+bool isAddressEmpty(uint16_t address) 
+{
+  Wire.beginTransmission(EEPROM_I2C_ADDRESS);
+  Wire.write(highByte(address));
+  Wire.write(lowByte(address));
+  Wire.endTransmission();
+
+  Wire.requestFrom(EEPROM_I2C_ADDRESS, 1);
+  return Wire.available() && Wire.read() == 0xFF;
+}
 
 /*======================================================================*/
 
@@ -169,7 +280,6 @@ void do_settings(void){
 void do_display(void)
 {
     Serial.println();
-
     char time_array[20];
     sprintf(time_array,"%02d:%02d:%02d %02d,%02d,%04d",rtc.now().hour(),rtc.now().minute(),rtc.now().second(),rtc.now().day(),rtc.now().month(),rtc.now().year());
     Serial.println(time_array);
@@ -190,6 +300,9 @@ void do_display(void)
     Serial.print(illuminance,4);
     Serial.println(" lux");
 
+
+    saveSensorDataToEEPROM(temperature, humidity, pressure, illuminance, EEPROM_SENSOR_START_ADDRESS, EEPROM_SENSOR_END_ADDRESS);
+    
     menu.giveCmdPrompt();
 }
 
@@ -375,10 +488,9 @@ void do_set_date(void) {
     minutes = tempMinutes;
     seconds = tempSeconds;
     
-    Serial.println("\nTime set successfully:");
-
     rtc.adjust(DateTime(year,month,day,hours,minutes,seconds));
     char time_array[20];
+    Serial.println();
     sprintf(time_array, "%02d:%02d:%02d %02d,%02d,%04d", hours, minutes, seconds, day, month, year);
     Serial.println(time_array);
 
@@ -408,48 +520,10 @@ bool temp_check(void){
   }
 }
 
-/*======================================================================*/
-/*void do_time(void) {
-    if (millis() - prev_time >= 1000) {
-        prev_time = millis();
-        seconds++;
-
-        if (seconds == 60) {
-            seconds = 0;
-            minutes++;
-            if (minutes == 60) {
-                minutes = 0;
-                hours++;
-                if (hours == 24) {
-                    hours = 0;
-                    day++;
-
-                    int daysInMonth[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
-
-                    if ((year % 4 == 0 && year % 100 != 0) || (year % 400 == 0)) {
-                        daysInMonth[1] = 29; 
-                    }
-
-                    if (day > daysInMonth[month - 1]) {
-                        day = 1;
-                        month++;
-
-                        if (month > 12) {
-                            month = 1;
-                            year++;
-                        }
-                    }
-                }
-            }
-        }
-    }
-}*/
-
-
-/*======================================================================*/
 
 // Menu command structure
-stMenuCmd list[] = {
+stMenuCmd list[] = 
+{
     {txt_welcome},
     {txt_values, 's', do_settings},
     {txt_set_h, 'h' , do_set_h},
@@ -460,6 +534,7 @@ stMenuCmd list[] = {
     {txt_display, 'm', do_display},
     {txt_eeprom_save, 'e', saveConfigToEEPROM},
     {txt_eeprom_load, 'E', loadConfigFromEEPROM},
+    {txt_eeprom_load_data, 'D', []() { readSensorDataFromEEPROM(EEPROM_SENSOR_START_ADDRESS); }},
     {txt_continous, 'c', [](){continous_display=(!continous_display);}},
     {txt_reset, 'r', [](){Serial.println();
                           Serial.println("Resetting device...");
@@ -471,7 +546,7 @@ stMenuCmd list[] = {
      {txt_clear_alert,'a',[](){config.alert=0;
                               menu.giveCmdPrompt();}}
     
-    };
+   };
 /*======================================================================*/
 
 // Setup and initialization
@@ -506,19 +581,22 @@ void setup()
       Serial.println("HTS found!");
     }
 
-    if (! rtc.begin()) {
+    while (! rtc.begin()) {
     Serial.println("Couldn't find RTC");
-    while (1);
-    } else {
+    Serial.flush();
+    delay(10);
+    } 
       Serial.println("RTC found!");
-    }
+        
 
     if (! rtc.isrunning()) {
     Serial.println("RTC is NOT running, let's set the time!");
       do_set_date();
     }
 
+
     tsl.getAddr_TSL2571(TSL2571_DEFAULT_ADDRESS);
+    loadConfigFromEEPROM();
 
     tsl.begin();
 
@@ -560,26 +638,20 @@ void loop()
       menu.ExeCommand(CmdCode);
     }
  
-  
     humidity = HTS.readHumidity();
     lps331.getMeasurement(pressure);
     temperature = stlm75.readTemperatureC();
+    tsl.Measure_ALS();
+    illuminance = tsl.tsl_alsData.L;
 
     if((temperature>config.upper_temp_value)||(temperature<config.lower_temp_value)||(pressure>config.critical_pressure)||(humidity>config.critical_humidity)){
       config.alert=1;
     }
-    
-    //do_time();
     
     if(continous_display)
     {
       Serial.write(12);
       do_display();
         
-    }
-      
-     tsl.Measure_ALS();
-     illuminance = tsl.tsl_alsData.L;
-    
-    
+    }    
 }
