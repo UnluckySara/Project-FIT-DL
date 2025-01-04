@@ -47,6 +47,7 @@ Project FIT in ALICE. As part of the project, we decided to create environmental
   1. Improved continous display mode.
   2. LED signaling whether the device works.
   3. LED signaling temperature, pressure or humidity alerts.
+  4. Added saving of critical values ​​to EEPROM
 
 
 ## Documentation
