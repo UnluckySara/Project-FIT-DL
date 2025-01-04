@@ -47,8 +47,9 @@ Project FIT in ALICE. As part of the project, we decided to create environmental
   1. Improved continous display mode.
   2. LED signaling whether the device works.
   3. LED signaling temperature, pressure or humidity alerts.
-  4. Added saving of critical values ​​to EEPROM
-
+  4. Added saving of critical values ​​to EEPROM.
+- December 19, 2024 - January 9, 2025:
+  1. Added saving of sensor values ​​to EEPROM memory.
 
 ## Documentation
 
