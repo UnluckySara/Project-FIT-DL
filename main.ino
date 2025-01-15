@@ -62,18 +62,18 @@ ConfigData config = {
 SerialMenuCmd menu;
 
 tMenuCmdTxt txt_welcome[] = "Welcome to the configuration window.\n";
-tMenuCmdTxt txt_values[] = "s - display current settings.";
+tMenuCmdTxt txt_values[] = "s - display settings.";
 tMenuCmdTxt txt_set_h[] = "h - set critical value humidity.";
 tMenuCmdTxt txt_set_p[] = "p - set critical value pressure.";
-tMenuCmdTxt txt_set_tl[] = "t - set lower critical temperature value.";
-tMenuCmdTxt txt_set_th[] = "T - set higher critical temperature value.";
-tMenuCmdTxt txt_reset[] = "r - reset device.";
+tMenuCmdTxt txt_set_tl[] = "t - set lower critical temperature.";
+tMenuCmdTxt txt_set_th[] = "T - set higher critical temperature.";
+tMenuCmdTxt txt_reset[] = "r - reset.";
 tMenuCmdTxt txt_display[] = "m - display last measurement.";
 tMenuCmdTxt txt_set_date[] = "d - set current date.";
-tMenuCmdTxt txt_continous[] = "c - toggle continous measurement display.";
+tMenuCmdTxt txt_continous[] = "c - toggle continous measurement.";
 tMenuCmdTxt txt_clear_alert[] = "a - clear alert.";
-tMenuCmdTxt txt_eeprom_save[] = "e - save configuration to EEPROM.";
-tMenuCmdTxt txt_eeprom_load[] = "E - load configuration from EEPROM.";
+tMenuCmdTxt txt_eeprom_save[] = "e - save conf to EEPROM.";
+tMenuCmdTxt txt_eeprom_load[] = "E - load conf from EEPROM.";
 tMenuCmdTxt txt_eeprom_load_data[] = "D - load data from EEPROM.";
 tMenuCmdTxt txt5_DisplayMenu[] = "? - Display menu.";
 
@@ -218,7 +218,7 @@ void saveConfigToEEPROM()
   }
 
   delay(EEPROM_WRITE_DELAY);
-  Serial.println("Configuration saved successfully!");
+  Serial.println("Configuration saved success!");
 }
 
 void loadConfigFromEEPROM() 
@@ -247,9 +247,9 @@ void loadConfigFromEEPROM()
   Serial.println(config.critical_humidity);
   Serial.print("Critical Pressure: ");
   Serial.println(config.critical_pressure); 
-  Serial.print("Lower Temperature Value: ");
+  Serial.print("Lower Temperature: ");
   Serial.println(config.lower_temp_value);
-  Serial.print("Upper Temperature Value: ");
+  Serial.print("Upper Temperature: ");
   Serial.println(config.upper_temp_value);
 }
 
@@ -260,16 +260,16 @@ void loadConfigFromEEPROM()
 void do_settings(void){
     Serial.println();
     Serial.println("Current settings:");
-    Serial.print("Critical value humidity: ");
+    Serial.print("Critical humidity: ");
     Serial.print(config.critical_humidity);
     Serial.println(" %");
-    Serial.print("Critical value pressure: ");
+    Serial.print("Critical pressure: ");
     Serial.print(config.critical_pressure);
     Serial.println(" mbar");
-    Serial.print("Lower critical temperature value: ");
+    Serial.print("Lower critical temperature: ");
     Serial.print(config.lower_temp_value);
     Serial.println(" C");
-    Serial.print("Upper critical temperature value: ");
+    Serial.print("Upper critical temperature: ");
     Serial.print(config.upper_temp_value);
     Serial.println(" C");
 
@@ -308,7 +308,7 @@ void do_display(void)
 
 // Update critical humidity value
 void do_set_h(void){
-  String aValue = "Enter critical humidity value";
+  String aValue = "Enter critical humidity";
 
   if (menu.getStrValue(aValue) == false)
   {
@@ -318,7 +318,7 @@ void do_set_h(void){
   {
     Serial.println();
     config.critical_humidity = atof(aValue.c_str());
-    Serial.print("Critical value humidity: ");
+    Serial.print("Critical humidity: ");
     Serial.print(config.critical_humidity);
     Serial.println(" %");
   }
@@ -328,7 +328,7 @@ void do_set_h(void){
 
 // Update critical pressure value
 void do_set_p(void){
-  String aValue = "Enter critical pressure value";
+  String aValue = "Enter critical pressure";
 
   if (menu.getStrValue(aValue) == false)
   {
@@ -338,7 +338,7 @@ void do_set_p(void){
   {
     Serial.println();
     config.critical_pressure = atof(aValue.c_str());
-    Serial.print("Critical pressure value: ");
+    Serial.print("Critical pressure: ");
     Serial.print(config.critical_pressure);
     Serial.println(" mbar");
   }
@@ -348,7 +348,7 @@ void do_set_p(void){
 
 // Update lower critical temperature value
 void do_set_tl(void){
-  String aValue = "Enter lower critical temperature value";
+  String aValue = "Enter lower critical temperature";
 
   if (menu.getStrValue(aValue) == false)
   {
@@ -358,7 +358,7 @@ void do_set_tl(void){
   {
     Serial.println();
     config.lower_temp_value = atof(aValue.c_str());
-    Serial.print("Lower critical value temperature: ");
+    Serial.print("Lower critical temperature: ");
     Serial.print(config.lower_temp_value);
     Serial.println(" C");
   }
@@ -373,7 +373,7 @@ void do_set_tl(void){
 
 // Update upper critical temperature value
 void do_set_th(void){
-  String aValue = "Enter upper critical temperature value";
+  String aValue = "Enter upper critical temperature";
 
   if (menu.getStrValue(aValue) == false)
   {
@@ -383,7 +383,7 @@ void do_set_th(void){
   {
     Serial.println();
     config.upper_temp_value = atof(aValue.c_str());
-    Serial.print("Upper critical value temperature: ");
+    Serial.print("Upper critical temperature: ");
     Serial.print(config.upper_temp_value);
     Serial.println(" C");
   }
@@ -424,59 +424,35 @@ void do_set_date(void) {
     aValue = "Enter year:";
     if (menu.getStrValue(aValue)) {
         tempYear = atoi(aValue.c_str());
-    } else {
-        Serial.println("Invalid entry for year.");
-        menu.giveCmdPrompt();
-        return;
     }
 
     aValue = "Enter month:";
     if (menu.getStrValue(aValue)) {
         tempMonth = atoi(aValue.c_str());
-    } else {
-        Serial.println("Invalid entry for month.");
-        menu.giveCmdPrompt();
-        return;
     }
-
     aValue = "Enter day:";
+
     if (menu.getStrValue(aValue)) {
         tempDay = atoi(aValue.c_str());
-    } else {
-        Serial.println("Invalid entry for day.");
-        menu.giveCmdPrompt();
-        return;
     }
 
     aValue = "Enter hour:";
     if (menu.getStrValue(aValue)) {
         tempHours = atoi(aValue.c_str());
-    } else {
-        Serial.println("Invalid entry for hour.");
-        menu.giveCmdPrompt();
-        return;
     }
 
     aValue = "Enter minute:";
     if (menu.getStrValue(aValue)) {
         tempMinutes = atoi(aValue.c_str());
-    } else {
-        Serial.println("Invalid entry for minute.");
-        menu.giveCmdPrompt();
-        return;
-    }
+    } 
 
     aValue = "Enter second:";
     if (menu.getStrValue(aValue)) {
         tempSeconds = atoi(aValue.c_str());
-    } else {
-        Serial.println("Invalid entry for second.");
-        menu.giveCmdPrompt();
-        return;
-    }
+    } 
 
     if (!isValidDate(tempYear, tempMonth, tempDay, tempHours, tempMinutes, tempSeconds)) {
-        Serial.println("\nInvalid date or time entered. Please try again.");
+        Serial.println("\nInvalid date or time entered. Try again.");
         menu.giveCmdPrompt();
         return;
     }
@@ -506,10 +482,10 @@ bool temp_check(void){
     //Serial.println("Lower critical value must be lower than upper critical value!!");
     Serial.println("Values you are trying to set:");
     Serial.println();
-    Serial.print("Lower critical value temperature: ");
+    Serial.print("Lower critical temperature: ");
     Serial.print(config.lower_temp_value);
     Serial.println(" C");
-    Serial.print("Upper critical value temperature: ");
+    Serial.print("Upper critical temperature: ");
     Serial.print(config.upper_temp_value);
     Serial.println(" C");
     Serial.println();
@@ -559,7 +535,8 @@ void setup()
     Wire.begin();
 
     if (menu.begin(list, NbCmds, txt_Prompt) == false)
-    {
+    { 
+      Serial.println("Err");
       while (true);
     }
     
@@ -590,7 +567,7 @@ void setup()
         
 
     if (! rtc.isrunning()) {
-    Serial.println("RTC is NOT running, let's set the time!");
+    Serial.println("RTC is NOT running");
       do_set_date();
     }
 
@@ -652,6 +629,5 @@ void loop()
     {
       Serial.write(12);
       do_display();
-        
     }    
 }
