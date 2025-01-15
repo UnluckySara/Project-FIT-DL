@@ -15,10 +15,10 @@
 
 // EEPROM CONFIG 
 #define EEPROM_I2C_ADDRESS 0x50
-#define EEPROM_WRITE_DELAY 5
+#define EEPROM_WRITE_DELAY 10
 #define EEPROM_START_ADDRESS 0x0001 
-#define EEPROM_SENSOR_START_ADDRESS 0x16  
-#define EEPROM_SENSOR_END_ADDRESS 0x7D00
+#define EEPROM_SENSOR_START_ADDRESS 0x0020
+#define EEPROM_SENSOR_END_ADDRESS 32768
 
 
 /*======================================================================*/
@@ -74,6 +74,7 @@ tMenuCmdTxt txt_continous[] = "c - toggle continous measurement.";
 tMenuCmdTxt txt_clear_alert[] = "a - clear alert.";
 tMenuCmdTxt txt_eeprom_save[] = "e - save conf to EEPROM.";
 tMenuCmdTxt txt_eeprom_load[] = "E - load conf from EEPROM.";
+tMenuCmdTxt txt_clear_eeprom[] = "X - clear EEPROM.";
 tMenuCmdTxt txt_eeprom_load_data[] = "D - load data from EEPROM.";
 tMenuCmdTxt txt5_DisplayMenu[] = "? - Display menu.";
 
@@ -85,18 +86,43 @@ tMenuCmdTxt txt_Prompt[] = "";
 void(* resetFunc) (void) = 0;
 
 /*======================================================================*/
+void clearEEPROM(uint16_t startAddress, uint16_t endAddress)
+{
+    Serial.println();
+    Serial.println("Clearing EEPROM...");
+
+    for (uint16_t address = startAddress; address < endAddress; address++) {
+        if (address >= EEPROM_START_ADDRESS && address < EEPROM_SENSOR_START_ADDRESS) {
+            continue;
+        }
+        Wire.beginTransmission(EEPROM_I2C_ADDRESS);
+        Wire.write(highByte(address));
+        Wire.write(lowByte(address));
+        Wire.write(0xFF);
+        if (Wire.endTransmission() != 0) {
+            Serial.println("Error clearing EEPROM at address: " + String(address));
+            return;
+        }
+        delay(50);
+        
+    }
+    resetFunc();
+    Serial.println("EEPROM cleared successfully!");
+}
+
 void saveSensorDataToEEPROM(float temp, float humidity, float pressure, float illuminance, uint16_t startAddress, uint16_t endAddress) 
 {
   uint16_t currentAddress = startAddress;
   
   while (!isAddressEmpty(currentAddress)) 
   {
-    currentAddress += sizeof(float) * 4;
-    if (currentAddress >= endAddress) 
-    {
-      currentAddress = startAddress;
-    }
+        currentAddress += sizeof(float) * 4;
+        if (currentAddress >= endAddress) 
+        {      
+            currentAddress = startAddress;
+        }
   }
+    
 
   Wire.beginTransmission(EEPROM_I2C_ADDRESS);
   Wire.write(highByte(currentAddress));
@@ -512,6 +538,7 @@ stMenuCmd list[] =
     {txt_eeprom_load, 'E', loadConfigFromEEPROM},
     {txt_eeprom_load_data, 'D', []() { readSensorDataFromEEPROM(EEPROM_SENSOR_START_ADDRESS); }},
     {txt_continous, 'c', [](){continous_display=(!continous_display);}},
+    {txt_clear_eeprom, 'X',[]() { clearEEPROM(EEPROM_SENSOR_START_ADDRESS, EEPROM_SENSOR_END_ADDRESS); menu.giveCmdPrompt(); }},
     {txt_reset, 'r', [](){Serial.println();
                           Serial.println("Resetting device...");
                           delay(3000);
