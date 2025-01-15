@@ -50,6 +50,8 @@ Project FIT in ALICE. As part of the project, we decided to create environmental
   4. Added saving of critical values ​​to EEPROM.
 - December 19, 2024 - January 9, 2025:
   1. Added saving of sensor values ​​to EEPROM memory.
+- January 10, 2025 - January 16, 2025:
+  1. Added functions for clearing EEPROM contents.
 
 ## Documentation
 
