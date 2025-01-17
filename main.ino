@@ -15,10 +15,10 @@
 
 // EEPROM CONFIG 
 #define EEPROM_I2C_ADDRESS 0x50
-#define EEPROM_WRITE_DELAY 10
+#define EEPROM_WRITE_DELAY 5
 #define EEPROM_START_ADDRESS 0x0001 
 #define EEPROM_SENSOR_START_ADDRESS 0x0020
-#define EEPROM_SENSOR_END_ADDRESS 32768
+#define EEPROM_SENSOR_END_ADDRESS 4096
 
 
 /*======================================================================*/
@@ -92,9 +92,6 @@ void clearEEPROM(uint16_t startAddress, uint16_t endAddress)
     Serial.println("Clearing EEPROM...");
 
     for (uint16_t address = startAddress; address < endAddress; address++) {
-        if (address >= EEPROM_START_ADDRESS && address < EEPROM_SENSOR_START_ADDRESS) {
-            continue;
-        }
         Wire.beginTransmission(EEPROM_I2C_ADDRESS);
         Wire.write(highByte(address));
         Wire.write(lowByte(address));
@@ -103,26 +100,21 @@ void clearEEPROM(uint16_t startAddress, uint16_t endAddress)
             Serial.println("Error clearing EEPROM at address: " + String(address));
             return;
         }
-        delay(50);
+        delay(EEPROM_WRITE_DELAY);
         
     }
-    resetFunc();
     Serial.println("EEPROM cleared successfully!");
 }
 
 void saveSensorDataToEEPROM(float temp, float humidity, float pressure, float illuminance, uint16_t startAddress, uint16_t endAddress) 
 {
-  uint16_t currentAddress = startAddress;
   
-  while (!isAddressEmpty(currentAddress)) 
-  {
-        currentAddress += sizeof(float) * 4;
-        if (currentAddress >= endAddress) 
-        {      
-            currentAddress = startAddress;
-        }
+  static uint16_t currentAddress = startAddress;
+
+  if ((currentAddress + sizeof(float) * 4) >= endAddress) 
+  {      
+      currentAddress = EEPROM_SENSOR_START_ADDRESS;
   }
-    
 
   Wire.beginTransmission(EEPROM_I2C_ADDRESS);
   Wire.write(highByte(currentAddress));
@@ -145,6 +137,9 @@ void saveSensorDataToEEPROM(float temp, float humidity, float pressure, float il
 
   delay(EEPROM_WRITE_DELAY);
   Serial.println("Sensor data saved to EEPROM!");
+
+  currentAddress += sizeof(float) * 4;
+  
 }
 
 void readSensorDataFromEEPROM(uint16_t startAddress) 
