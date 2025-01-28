@@ -55,6 +55,7 @@ Project FIT in ALICE. As part of the project, we decided to create environmental
   2. Fixing EEPROM write
 
 ## Documentation
+[View documentation](Documentation.pdf)
 
 ## Authors
 Sara Libirt and Jakub Kozdrój.
